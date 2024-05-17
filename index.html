@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obliczanie MRP</title>
+    <style>
+        table {
+            width: 50%;
+            border-collapse: collapse;
+            margin: 20px auto;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        caption {
+            caption-side: top;
+            font-size: 1.5em;
+            margin: 10px;
+        }
+        #calculateBtn {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            font-size: 1em;
+        }
+        form {
+            width: 50%;
+            margin: 20px auto;
+        }
+        form div {
+            margin-bottom: 10px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+
+<form id="mrpForm">
+    <div>
+        <label for="zamowienieStoly">Zamówienia na stoły (szt. na tydzień):</label>
+        <input type="number" id="zamowienieStoly1" value="0" required> Tydzień 1
+        <input type="number" id="zamowienieStoly2" value="0" required> Tydzień 2
+        <input type="number" id="zamowienieStoly3" value="0" required> Tydzień 3
+        <input type="number" id="zamowienieStoly4" value="0" required> Tydzień 4
+        <input type="number" id="zamowienieStoly5" value="20" required> Tydzień 5
+        <input type="number" id="zamowienieStoly6" value="0" required> Tydzień 6
+        <input type="number" id="zamowienieStoly7" value="40" required> Tydzień 7
+    </div>
+    <div>
+        <label for="zapasNogi">Aktualne zapasy nóg (szt.):</label>
+        <input type="number" id="zapasNogi" value="40" required>
+    </div>
+    <div>
+        <label for="zapasBlaty">Aktualne zapasy blatów (szt.):</label>
+        <input type="number" id="zapasBlaty" value="22" required>
+    </div>
+    <div>
+        <label for="zapasDeski">Aktualne zapasy desek (szt.):</label>
+        <input type="number" id="zapasDeski" value="100" required>
+    </div>
+    <div>
+        <label for="czasNogi">Czas produkcji nóg (tygodnie):</label>
+        <input type="number" id="czasNogi" value="2" required>
+    </div>
+    <div>
+        <label for="czasBlaty">Czas produkcji blatów (tygodnie):</label>
+        <input type="number" id="czasBlaty" value="3" required>
+    </div>
+    <div>
+        <label for="czasDeski">Czas produkcji desek (tygodnie):</label>
+        <input type="number" id="czasDeski" value="1" required>
+    </div>
+    <button type="button" id="calculateBtn">Wylicz MRP</button>
+</form>
+
+<div id="tablesContainer"></div>
+
+<script>
+    // Funkcja do obliczania MRP dla komponentu
+    function obliczMRP(potrzebyBrutto, zapasPoczatkowy, czasRealizacji) {
+        let zapasNaStanie = zapasPoczatkowy; // Aktualny poziom zapasu
+        let potrzebyNetto = []; // Tablica potrzeb netto
+        let planowaneZlecenia = []; // Tablica planowanych zleceń
+        let planowaneOdbiory = Array(7).fill(0); // Tablica planowanych odbiorów, zainicjowana zerami
+
+        // Pętla przez każdy tydzień do obliczenia MRP
+        for (let tydzien = 0; tydzien < 7; tydzien++) {
+            // Aktualizuj zapas na stanie, jeśli są planowane odbiory w tym tygodniu
+            if (tydzien >= czasRealizacji) {
+                zapasNaStanie += planowaneOdbiory[tydzien - czasRealizacji];
+            }
+            // Oblicz potrzeby netto na dany tydzień
+            let potrzebaNetto = Math.max(potrzebyBrutto[tydzien] - zapasNaStanie, 0);
+            potrzebyNetto.push(potrzebaNetto);
+            // Aktualizuj zapas na stanie po uwzględnieniu potrzeb brutto
+            zapasNaStanie = Math.max(zapasNaStanie - potrzebyBrutto[tydzien], 0);
+            // Określ planowane zlecenie na podstawie potrzeby netto
+            let zlecenie = potrzebaNetto > 0 ? potrzebaNetto : 0;
+            planowaneZlecenia.push(zlecenie);
+            // Zaplanuj odbiór na przyszły tydzień na podstawie czasu realizacji
+            if (tydzien + czasRealizacji < 7) {
+                planowaneOdbiory[tydzien + czasRealizacji] = zlecenie;
+            }
+        }
+
+        return { potrzebyNetto, planowaneZlecenia, planowaneOdbiory };
+    }
+
+    // Funkcja do tworzenia i aktualizacji tabeli
+    function utworzIaktualizujTabele(id, tytul, potrzebyBrutto, zapasPoczatkowy, czasRealizacji) {
+        const tabela = document.createElement('table'); // Tworzenie elementu tabeli
+        tabela.id = id; // Ustawianie ID tabeli
+
+        const naglowek = document.createElement('caption'); // Tworzenie elementu nagłówka
+        naglowek.textContent = tytul; // Ustawianie tekstu nagłówka
+        tabela.appendChild(naglowek); // Dodawanie nagłówka do tabeli
+
+        const thead = document.createElement('thead'); // Tworzenie nagłówka tabeli
+        const wierszNaglowka1 = document.createElement('tr'); // Tworzenie pierwszego wiersza nagłówka
+        wierszNaglowka1.innerHTML = `<th>Poziom</th><th>${tytul.split(' ')[2]}</th>`;
+        thead.appendChild(wierszNaglowka1); // Dodawanie pierwszego wiersza nagłówka do thead
+
+        const wierszNaglowka2 = document.createElement('tr'); // Tworzenie drugiego wiersza nagłówka
+        wierszNaglowka2.innerHTML = '<th>Tydzień</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th>';
+        thead.appendChild(wierszNaglowka2); // Dodawanie drugiego wiersza nagłówka do thead
+        tabela.appendChild(thead); // Dodawanie thead do tabeli
+
+        const tbody = document.createElement('tbody'); // Tworzenie elementu ciała tabeli
+
+        // Tworzenie i dodawanie wiersza potrzeb brutto
+        const wierszPotrzebyBrutto = document.createElement('tr');
+        wierszPotrzebyBrutto.innerHTML = `<td>Potrzeby brutto</td>${potrzebyBrutto.map(pb => `<td>${pb || ''}</td>`).join('')}`;
+        tbody.appendChild(wierszPotrzebyBrutto);
+
+        // Tworzenie i dodawanie wiersza zapasu początkowego
+        const wierszZapasPoczatkowy = document.createElement('tr');
+        wierszZapasPoczatkowy.innerHTML = `<td>Wstępny zapas</td>${Array(7).fill(zapasPoczatkowy).map(zp => `<td>${zp}</td>`).join('')}`;
+        tbody.appendChild(wierszZapasPoczatkowy);
+
+        // Tworzenie i dodawanie wiersza potrzeb netto
+        const wierszPotrzebyNetto = document.createElement('tr');
+        wierszPotrzebyNetto.innerHTML = `<td>Potrzeby netto</td>${Array(7).fill('').map(() => '<td></td>').join('')}`;
+        tbody.appendChild(wierszPotrzebyNetto);
+
+        // Tworzenie i dodawanie wiersza planowanych zleceń
+        const wierszPlanowaneZlecenia = document.createElement('tr');
+        wierszPlanowaneZlecenia.innerHTML = `<td>Wstępne zmontowanie</td>${Array(7).fill('').map(() => '<td></td>').join('')}`;
+        tbody.appendChild(wierszPlanowaneZlecenia);
+
+        // Tworzenie i dodawanie wiersza planowanych odbiorów
+        const wierszPlanowaneOdbiory = document.createElement('tr');
+        wierszPlanowaneOdbiory.innerHTML = `<td>Zaplanowany odbiór</td>${Array(7).fill('').map(() => '<td></td>').join('')}`;
+        tbody.appendChild(wierszPlanowaneOdbiory);
+
+        tabela.appendChild(tbody); // Dodawanie tbody do tabeli
+        document.getElementById('tablesContainer').appendChild(tabela); // Dodawanie tabeli do kontenera
+
+        const mrp = obliczMRP(potrzebyBrutto, zapasPoczatkowy, czasRealizacji); // Obliczanie MRP
+
+        const komorkiPotrzebyNetto = tabela.querySelectorAll('tbody tr:nth-child(3) td'); // Wybieranie komórek potrzeb netto
+        const komorkiPlanowaneZlecenia = tabela.querySelectorAll('tbody tr:nth-child(4) td'); // Wybieranie komórek planowanych zleceń
+        const komorkiPlanowaneOdbiory = tabela.querySelectorAll('tbody tr:nth-child(5) td'); // Wybieranie komórek planowanych odbiorów
+
+        // Aktualizowanie komórek potrzeb netto obliczonymi wartościami
+        mrp.potrzebyNetto.forEach((pn, index) => {
+            if (index >= 1) {
+                komorkiPotrzebyNetto[index].textContent = pn;
+            }
+        });
+
+        // Aktualizowanie komórek planowanych zleceń i planowanych odbiorów obliczonymi wartościami
+        mrp.planowaneZlecenia.forEach((pz, index) => {
+            if (index >= 1) {
+                komorkiPlanowaneZlecenia[index].textContent = pz;
+                komorkiPlanowaneOdbiory[index].textContent = pz;
+            }
+        });
+
+        return mrp; // Zwracanie danych MRP
+    }
+
+    // Funkcja do uruchamiania obliczeń MRP
+    function uruchomMRP() {
+        // Pobieranie wartości z formularza
+        const zamowienieStoly = [
+            parseInt(document.getElementById('zamowienieStoly1').value),
+            parseInt(document.getElementById('zamowienieStoly2').value),
+            parseInt(document.getElementById('zamowienieStoly3').value),
+            parseInt(document.getElementById('zamowienieStoly4').value),
+            parseInt(document.getElementById('zamowienieStoly5').value),
+            parseInt(document.getElementById('zamowienieStoly6').value),
+            parseInt(document.getElementById('zamowienieStoly7').value)
+        ];
+        const zapasNogi = parseInt(document.getElementById('zapasNogi').value);
+        const zapasBlaty = parseInt(document.getElementById('zapasBlaty').value);
+        const zapasDeski = parseInt(document.getElementById('zapasDeski').value);
+        const czasNogi = parseInt(document.getElementById('czasNogi').value);
+        const czasBlaty = parseInt(document.getElementById('czasBlaty').value);
+        const czasDeski = parseInt(document.getElementById('czasDeski').value);
+
+        // Czyszczenie kontenera na tabele
+        document.getElementById('tablesContainer').innerHTML = '';
+
+        // Obliczenia MRP dla stołów
+        const potrzebyBruttoStoly = zamowienieStoly; // Potrzeby brutto dla stołów
+        const zapasPoczatkowyStoly = 2; // Początkowy zapas dla stołów
+        const czasRealizacjiStoly = 1; // Czas realizacji dla stołów
+        const mrpStoly = utworzIaktualizujTabele('mrpStoly', 'Harmonogram MRP - poziom 0 (Stoły)', potrzebyBruttoStoly, zapasPoczatkowyStoly, czasRealizacjiStoly);
+
+        // Obliczenia MRP dla nóg
+        const potrzebyBruttoNogi = zamowienieStoly.map(zamowienie => zamowienie * 4); // Potrzeby brutto dla nóg (4 nogi na stół)
+        const zapasPoczatkowyNogi = zapasNogi; // Początkowy zapas dla nóg
+        const czasRealizacjiNogi = czasNogi; // Czas realizacji dla nóg
+        const mrpNogi = utworzIaktualizujTabele('mrpNogi', 'Harmonogram MRP - poziom 1 (Nogi)', potrzebyBruttoNogi, zapasPoczatkowyNogi, czasRealizacjiNogi);
+
+        // Obliczenia MRP dla blatów
+        const potrzebyBruttoBlaty = zamowienieStoly; // Potrzeby brutto dla blatów (1 blat na stół)
+        const zapasPoczatkowyBlaty = zapasBlaty; // Początkowy zapas dla blatów
+        const czasRealizacjiBlaty = czasBlaty; // Czas realizacji dla blatów
+        const mrpBlaty = utworzIaktualizujTabele('mrpBlaty', 'Harmonogram MRP - poziom 1 (Blaty)', potrzebyBruttoBlaty, zapasPoczatkowyBlaty, czasRealizacjiBlaty);
+
+        // Obliczenia MRP dla desek (wymaganych do produkcji blatów)
+        const potrzebyBruttoDeski = mrpBlaty.planowaneZlecenia.map(zlecenie => zlecenie * 5); // 5 desek na jeden blat
+        const zapasPoczatkowyDeski = zapasDeski; // Początkowy zapas dla desek
+        const czasRealizacjiDeski = czasDeski; // Czas realizacji dla desek
+        utworzIaktualizujTabele('mrpDeski', 'Harmonogram MRP - poziom 2 (Deski)', potrzebyBruttoDeski, zapasPoczatkowyDeski, czasRealizacjiDeski);
+    }
+
+    // Przypisanie funkcji do przycisku
+    document.getElementById('calculateBtn').addEventListener('click', uruchomMRP);
+</script>
+
+</body>
+</html>
+
